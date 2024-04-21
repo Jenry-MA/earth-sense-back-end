@@ -8,7 +8,7 @@
  */
 
 const functions = require("firebase-functions");
-const {initializeApp, cert} = require("firebase-admin/app")
+const {initializeApp, cert} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const express = require("express");
 const cors = require("cors");
@@ -19,15 +19,46 @@ const app = express();
 app.use(cors());
 
 initializeApp({
-    credential: cert(
-      path.resolve(__dirname, "./credentials.json")
-    )
-  });
+  credential: cert(path.resolve(__dirname, "./credentials.json")),
+});
 
 const db = getFirestore();
 
-app.post("/api/wet-sensor/create", async (req,res)=>{
-    await db.collection("test").doc(req.body.id).create({name: req.body.name});
+app.post("/api/wet-sensor/create", async (req, res) => {
+  try {
+    // Assuming db is your MongoDB database connection
+    await db
+        .collection("test")
+        .doc(req.body.id)
+        .create({name: req.body.name});
+
+    // Send a success response back to the client
+    return res.status(201).json({message: "Document created successfully"});
+  } catch (error) {
+    // If there's any error, send a 500 status with the error message
+    return res.status(500).json({error: error.message});
+  }
+});
+
+app.get("/api/wet-sensor/:id/show", async (req, res) => {
+  try {
+    // Assuming db is your MongoDB database connection
+    const docId = req.params.id; // Extracting id from URL parameters
+
+    // Fetch the document from MongoDB based on the provided id
+    const doc = await db.collection("test").doc(docId).get();
+
+    // If the document exists, send its data in the response
+    if (doc.exists) {
+      return res.json(doc.data());
+    } else {
+      // If the document doesn't exist, send a 404 status
+      return res.status(404).json({error: "Document not found"});
+    }
+  } catch (error) {
+    // If there's any error, send a 500 status with the error message
+    return res.status(500).json({error: error.message});
+  }
 });
 
 exports.app = functions.https.onRequest(app);
