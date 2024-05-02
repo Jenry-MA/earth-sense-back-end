@@ -48,6 +48,8 @@ build/Release
 # Dependency directories
 node_modules/
 
+functions/credentials.json
+
 # Optional npm cache directory
 .npm
 

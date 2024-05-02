@@ -8,8 +8,8 @@
  */
 
 const functions = require("firebase-functions");
-const {initializeApp, cert} = require("firebase-admin/app");
-const {getFirestore} = require("firebase-admin/firestore");
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -24,19 +24,60 @@ initializeApp({
 
 const db = getFirestore();
 
+/**
+ * routes temperature sensor
+ */
+
+app.post("/api/temperature-sensor/create", async (req, res)=>{
+  await db.collection("temperature")
+      .doc()
+      .create(req.body)
+      .then((response) => {
+        return response.status(200).json({
+          status: "success",
+          text: "Record registed.",
+        });
+      })
+      .catch((error) => {
+        return error.status(500).json({
+          status: "error",
+          text: "Something happend, try again.",
+          error: error,
+        });
+      });
+});
+
+app.post("/api/temperature-sensor/create", async (req, res)=>{
+  await db.collection("humidity")
+      .doc()
+      .create(req.body)
+      .then((response) => {
+        return response.status(200).json({
+          status: "success",
+          text: "Record registed.",
+        });
+      })
+      .catch((error) => {
+        return error.status(500).json({
+          status: "error",
+          text: "Something happend, try again.",
+          error: error,
+        });
+      });
+});
+
 app.post("/api/wet-sensor/create", async (req, res) => {
   try {
     // Assuming db is your MongoDB database connection
-    await db
-        .collection("test")
+    await db.collection("test")
         .doc(req.body.id)
-        .create({name: req.body.name});
+        .create({ name: req.body.name });
 
     // Send a success response back to the client
-    return res.status(201).json({message: "Document created successfully"});
+    return res.status(201).json({ message: "Document created successfully" });
   } catch (error) {
     // If there's any error, send a 500 status with the error message
-    return res.status(500).json({error: error.message});
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -53,11 +94,11 @@ app.get("/api/wet-sensor/:id/show", async (req, res) => {
       return res.json(doc.data());
     } else {
       // If the document doesn't exist, send a 404 status
-      return res.status(404).json({error: "Document not found"});
+      return res.status(404).json({ error: "Document not found" });
     }
   } catch (error) {
     // If there's any error, send a 500 status with the error message
-    return res.status(500).json({error: error.message});
+    return res.status(500).json({ error: error.message });
   }
 });
 
