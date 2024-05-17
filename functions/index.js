@@ -13,6 +13,8 @@ const { getFirestore } = require("firebase-admin/firestore");
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const { setDefaultOptions, fromUnixTime, format } = require("date-fns");
+const { es } = require("date-fns/locale");
 
 const app = express();
 
@@ -24,81 +26,74 @@ initializeApp({
 
 const db = getFirestore();
 
+// default setting for date-fns
+setDefaultOptions({ locale: es });
+
 /**
  * routes temperature sensor
  */
 
 app.post("/api/temperature-sensor/create", async (req, res)=>{
-  await db.collection("temperature")
-      .doc()
-      .create(req.body)
-      .then((response) => {
-        return response.status(200).json({
-          status: "success",
-          text: "Record registed.",
-        });
-      })
-      .catch((error) => {
-        return error.status(500).json({
-          status: "error",
-          text: "Something happend, try again.",
-          error: error,
-        });
-      });
-});
-
-app.post("/api/temperature-sensor/create", async (req, res)=>{
-  await db.collection("humidity")
-      .doc()
-      .create(req.body)
-      .then((response) => {
-        return response.status(200).json({
-          status: "success",
-          text: "Record registed.",
-        });
-      })
-      .catch((error) => {
-        return error.status(500).json({
-          status: "error",
-          text: "Something happend, try again.",
-          error: error,
-        });
-      });
-});
-
-app.post("/api/wet-sensor/create", async (req, res) => {
   try {
-    // Assuming db is your MongoDB database connection
-    await db.collection("test")
-        .doc(req.body.id)
-        .create({ name: req.body.name });
+    const response = await db.collection("temperature")
+        .doc()
+        .create(req.body);
 
-    // Send a success response back to the client
-    return res.status(201).json({ message: "Document created successfully" });
+    return res.status(200).json({
+      "message": "ok",
+      "data": response,
+    });
   } catch (error) {
-    // If there's any error, send a 500 status with the error message
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      "message": "error",
+      "error": error,
+    });
   }
 });
 
-app.get("/api/wet-sensor/:id/show", async (req, res) => {
+app.get("/api/temperature-sensor/index", async (req, res) => {
   try {
-    // Assuming db is your MongoDB database connection
-    const docId = req.params.id; // Extracting id from URL parameters
+    let query = db
+        .collection("temperature")
+        .orderBy("date_time", "desc");
 
-    // Fetch the document from MongoDB based on the provided id
-    const doc = await db.collection("test").doc(docId).get();
+    if (req.query.start && req.query.end) {
+      const start = req.query.start;
+      const end = req.query.end;
 
-    // If the document exists, send its data in the response
-    if (doc.exists) {
-      return res.json(doc.data());
-    } else {
-      // If the document doesn't exist, send a 404 status
-      return res.status(404).json({ error: "Document not found" });
+      query = query
+          .where("date_time", ">=", start)
+          .where("date_time", "<=", end);
     }
+
+    const querySnapshot = await query.get();
+    const docs = querySnapshot.docs;
+
+    const response = docs.map((doc) => {
+      const data = doc.data();
+      const humanDateTime = format(
+          fromUnixTime(data.date_time), "MM/dd/yyyy H:mm:ss",
+      );
+
+      return {
+        id: doc.id,
+        date_time: data.date_time,
+        human_date_time: humanDateTime,
+        heat_index_c: data.heat_index_c,
+        humidity: data.humidity,
+        temperature_c: data.temperature_c,
+      };
+    });
+
+    return res.status(200).json({
+      message: "ok",
+      data: response,
+    });
   } catch (error) {
-    // If there's any error, send a 500 status with the error message
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      message: "error",
+      error: error.message, // Include error message for better debugging
+    });
   }
 });
 
