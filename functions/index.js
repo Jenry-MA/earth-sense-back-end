@@ -131,13 +131,14 @@ app.get("/api/temperature-sensor/current-temperature", async (req, res) => {
     const querySnapshot = await query.get();
     const docs = querySnapshot.docs;
 
-    const response = docs.map((doc) => {
+    if (docs.length > 0) {
+      const doc = docs[0];
       const data = doc.data();
       const humanDateTime = format(
-          fromUnixTime(data.date_time), "MM/dd/yyyy H:mm:ss",
+        fromUnixTime(data.date_time), "MM/dd/yyyy H:mm:ss"
       );
 
-      return {
+      const response = {
         id: doc.id,
         date_time: data.date_time,
         human_date_time: humanDateTime,
@@ -145,9 +146,11 @@ app.get("/api/temperature-sensor/current-temperature", async (req, res) => {
         humidity: data.humidity,
         temperature_c: data.temperature_c,
       };
-    });
 
-    return res.status(200).json(response); // Use `response` instead of `data`
+      return res.status(200).json(response);
+    } else {
+      return res.status(404).json({ message: "No temperature data found" });
+    }
   } catch (error) {
     return res.status(500).json({
       message: "error",
