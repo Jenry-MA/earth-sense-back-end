@@ -36,9 +36,19 @@ setDefaultOptions({ locale: es });
 
 app.post("/api/temperature-sensor/create", async (req, res)=>{
   try {
+
+    const currentDate = new Date();
+    const unixDate = currentDate.getTime() / 1000; //get datetime in seconds
+
+    //create obj for save in bd
+    const body = {
+      ...req.body,
+      date_time: unixDate
+    };
+
     const response = await db.collection("temperature")
         .doc()
-        .create(req.body);
+        .create(body);
 
     return res.status(200).json({
       "message": "ok",
@@ -74,6 +84,7 @@ app.get("/api/temperature-sensor/index", async (req, res) => {
 
     const response = docs.map((doc) => {
       const data = doc.data();
+
       const humanDateTime = format(
           fromUnixTime(data.date_time), "MM/dd/yyyy H:mm:ss",
       );
@@ -88,16 +99,55 @@ app.get("/api/temperature-sensor/index", async (req, res) => {
       };
     });
 
-    const values = getMaxTemperaturesPerHour(response)
+    const values = getMaxValuesPerHour(response)
 
     const data = {
       message: "ok",
       data: response,
       label: label,
-      values: values
+      values: values.temperature_c,
+      temperature_c: values.temperature_c,
+      heat_index_c: values.heat_index_c,
+      humidity: values.humidity
     };
 
     return res.status(200).json(data);
+  } catch (error) {
+    return res.status(500).json({
+      message: "error",
+      error: error.message, // Include error message for better debugging
+    });
+  }
+});
+
+
+app.get("/api/temperature-sensor/current-temperature", async (req, res) => {
+  try {
+    let query = db
+        .collection("temperature")
+        .orderBy("date_time", "desc")
+        .limit(1);
+
+    const querySnapshot = await query.get();
+    const docs = querySnapshot.docs;
+
+    const response = docs.map((doc) => {
+      const data = doc.data();
+      const humanDateTime = format(
+          fromUnixTime(data.date_time), "MM/dd/yyyy H:mm:ss",
+      );
+
+      return {
+        id: doc.id,
+        date_time: data.date_time,
+        human_date_time: humanDateTime,
+        heat_index_c: data.heat_index_c,
+        humidity: data.humidity,
+        temperature_c: data.temperature_c,
+      };
+    });
+
+    return res.status(200).json(response); // Use `response` instead of `data`
   } catch (error) {
     return res.status(500).json({
       message: "error",
@@ -126,37 +176,53 @@ function getHoursOfDay(unixTimestamp) {
   return hoursOfDay;
 }
 
-function getMaxTemperaturesPerHour(records) {
-  // Objeto para almacenar las máximas temperaturas por hora
-  const maxTemperaturesPerHour = {};
+function getMaxValuesPerHour(records) {
+  // Init obj for set max values per hour
+  const maxValuesPerHour = {
+      temperature_c: {},
+      humidity: {},
+      heat_index_c: {}
+  };
 
-  // Iterar sobre cada registro
+  // for each records
   records.forEach(record => {
-      // Obtener la hora del registro
-      const dateTime = new Date(parseInt(record.date_time) * 1000); // Convertir a milisegundos
-      const hour = dateTime.getHours();
-      
-      // Verificar si ya existe una entrada para esta hora en maxTemperaturesPerHour
-      if (!maxTemperaturesPerHour[hour]) {
-          // Si no existe, crear una nueva entrada con la temperatura del registro
-          maxTemperaturesPerHour[hour] = parseFloat(record.temperature_c);
-      } else {
-          // Si ya existe, actualizar la temperatura si el registro actual es mayor
-          maxTemperaturesPerHour[hour] = Math.max(maxTemperaturesPerHour[hour], parseFloat(record.temperature_c));
-      }
+      const dateTime = new Date(record.date_time * 1000); // Convertir a milisegundos
+
+      // Ajustar la hora a la zona horaria de Guatemala (GMT-06:00)
+      const guatemalaOffset = -6 * 60; // -6 horas en minutos
+      const utcMinutes = dateTime.getUTCMinutes() + dateTime.getUTCHours() * 60;
+      const guatemalaTimeInMinutes = utcMinutes + guatemalaOffset;
+      const guatemalaHour = Math.floor(guatemalaTimeInMinutes / 60) % 24;
+
+      // Inner function for update obj in the specific property
+      const updateMaxValue = (parameter, value) => {
+          if (!maxValuesPerHour[parameter][guatemalaHour]) {
+              maxValuesPerHour[parameter][guatemalaHour] = parseFloat(value);
+          } else {
+              maxValuesPerHour[parameter][guatemalaHour] = Math.max(maxValuesPerHour[parameter][guatemalaHour], parseFloat(value));
+          }
+      };
+
+      // using inner function
+      updateMaxValue('temperature_c', record.temperature_c);
+      updateMaxValue('humidity', record.humidity);
+      updateMaxValue('heat_index_c', record.heat_index_c);
   });
 
-  // Crear un array con las máximas temperaturas por hora asegurando que todas las horas estén presentes
-  const maxTemperaturesArray = [];
+  // Init obj for put existing values and if no exit put 0
+  const maxValuesArray = {
+      temperature_c: [],
+      humidity: [],
+      heat_index_c: []
+  };
+
   for (let hour = 0; hour < 24; hour++) {
-      if (maxTemperaturesPerHour[hour] !== undefined) {
-          maxTemperaturesArray.push(maxTemperaturesPerHour[hour]);
-      } else {
-          maxTemperaturesArray.push(0);
-      }
+      maxValuesArray.temperature_c.push(maxValuesPerHour.temperature_c[hour] !== undefined ? maxValuesPerHour.temperature_c[hour] : 0);
+      maxValuesArray.humidity.push(maxValuesPerHour.humidity[hour] !== undefined ? maxValuesPerHour.humidity[hour] : 0);
+      maxValuesArray.heat_index_c.push(maxValuesPerHour.heat_index_c[hour] !== undefined ? maxValuesPerHour.heat_index_c[hour] : 0);
   }
-  
-  return maxTemperaturesArray;
+
+  return maxValuesArray;
 }
 
 
