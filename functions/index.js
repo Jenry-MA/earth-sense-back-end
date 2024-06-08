@@ -38,7 +38,8 @@ app.post("/api/temperature-sensor/create", async (req, res)=>{
   try {
 
     const currentDate = new Date();
-    const unixDate = currentDate.getTime() / 1000; //get datetime in seconds
+    const unixDate = Math.floor(currentDate.getTime() / 1000); // get datetime in seconds and remove fractional part
+
 
     //create obj for save in bd
     const body = {
@@ -47,8 +48,7 @@ app.post("/api/temperature-sensor/create", async (req, res)=>{
     };
 
     const response = await db.collection("temperature")
-        .doc()
-        .create(body);
+        .add(body);
 
     return res.status(200).json({
       "message": "ok",
@@ -71,8 +71,8 @@ app.get("/api/temperature-sensor/index", async (req, res) => {
     let label = [];
     if (req.query.start && req.query.end) {
       label = getHoursOfDay(req.query.start);
-      const start = req.query.start;
-      const end = req.query.end;
+      const start = Number(req.query.start);
+      const end = Number(req.query.end);
 
       query = query
           .where("date_time", ">=", start)
