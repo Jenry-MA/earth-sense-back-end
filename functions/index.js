@@ -6,6 +6,7 @@
  *
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
+
 const functions = require("firebase-functions")
 const { initializeApp, cert } = require( "firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -37,9 +38,8 @@ setDefaultOptions({ locale: es });
 app.post("/api/temperature-sensor/create", async (req, res)=>{
   try {
 
-    const currentDate = new Date();
-    const unixDate = Math.floor(currentDate.getTime() / 1000); // get datetime in seconds and remove fractional part
-
+    const currentDate = new Date().toLocaleString("en-US", {timeZone: "America/Guatemala"});
+    const unixDate = Math.floor(new Date(currentDate).getTime() / 1000); // Obtener la fecha y hora en segundos y eliminar la parte fraccionaria
 
     //create obj for save in bd
     const body = {
@@ -159,6 +159,7 @@ app.get("/api/temperature-sensor/current-temperature", async (req, res) => {
   }
 });
 
+
 function getHoursOfDay(unixTimestamp) {
   const startDate = new Date(
       unixTimestamp * 1000); // Convertir UNIX a milisegundos
@@ -189,14 +190,10 @@ function getMaxValuesPerHour(records) {
 
   // for each records
   records.forEach(record => {
-      const dateTime = new Date(record.date_time * 1000); // Convertir a milisegundos
-
-      // Ajustar la hora a la zona horaria de Guatemala (GMT-06:00)
-      const guatemalaOffset = -6 * 60; // -6 horas en minutos
-      const utcMinutes = dateTime.getUTCMinutes() + dateTime.getUTCHours() * 60;
-      const guatemalaTimeInMinutes = utcMinutes + guatemalaOffset;
-      const guatemalaHour = Math.floor(guatemalaTimeInMinutes / 60) % 24;
-
+     // Dentro de la función getMaxValuesPerHour
+const dateTime = new Date(record.date_time * 1000); // Convertir a milisegundos
+//const guatemalaHour = new Date(dateTime.toLocaleString("en-US", {timeZone: "America/Guatemala"})).getHours();
+const guatemalaHour = dateTime.getHours();
       // Inner function for update obj in the specific property
       const updateMaxValue = (parameter, value) => {
           if (!maxValuesPerHour[parameter][guatemalaHour]) {
